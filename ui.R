@@ -47,9 +47,8 @@ shinyUI(
                tabPanel("Fireball",
                         tags$style(type = "text/css", "#Map {height: calc(100vh - 80px) !important;}"),
                         leafletOutput("Map"),
-                        absolutePanel(top = 82, left = 69, 
-                                      actionButton("sat_button", "Satellite Image", icon = icon("search")),
-                                      strong(htmlOutput("sat_error")))
+                        absolutePanel(bottom = 25, left = 25, 
+                                      DT::dataTableOutput("fireball_table"))
                ),
                
                tabPanel("Datasets",

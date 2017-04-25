@@ -101,6 +101,7 @@ for(i in c(2, 3, 4, 6, 8, 9)) {
 
 # Remove lon/lat NA's --------------------------------------------------------------------------------
 fireball_data_trans <- subset(fireball_data_trans, !is.na(lon) & !is.na(lat))
+fireball_data_trans[is.na(fireball_data_trans)] <- "-"
 
 # Create lon/lat that can be plotted correctly -------------------------------------------------------
 fireball_data_trans$lat[fireball_data_trans$`lat-dir`== "S"] <- -fireball_data_trans$lat[fireball_data_trans$`lat-dir`== "S"]
@@ -110,20 +111,24 @@ fireball_data_trans$lon[fireball_data_trans$`lon-dir`== "W"] <- -fireball_data_t
 colnames(fireball_data_trans)[6] <- "lng"
 fireball_data_trans$id <- 1:nrow(fireball_data_trans)
 
-# Create popup ---------------------------------------------------------------------------------------
-fireball_data_trans[is.na(fireball_data_trans)] <- "-"
+# Create geo_location column -------------------------------------------------------------------------
+fireball_data_trans$geo_location <- stri_paste("(", fireball_data_trans$lat, ", ", fireball_data_trans$lng, ")")
 
-fireball_data_trans$GeoLocation <- stri_paste("(", fireball_data_trans$lat, ", ", fireball_data_trans$lng, ")")
+# Remove not needed columns --------------------------------------------------------------------------
+for(i in c("lat-dir", "lon-dir")) {
+    fireball_data_trans[, i] <- NULL
+}
 
-fireball_data_trans$popup <- stri_paste("<table id='popup'>
-<tr><th>Attribute</th><th>Value</th></tr>",
-                                        "<tr><td>Geo Location</td><td>", fireball_data_trans$GeoLocation, "</td></tr>",
-                                        "<tr><td>Date</td><td>", as.character(fireball_data_trans$date), "</td></tr>",
-                                        "<tr><td>Energy</td><td>", fireball_data_trans$energy, "</td></tr>",
-                                        "<tr><td>Impact Energy</td><td>", fireball_data_trans$`impact-e`, "</td></tr>",
-                                        "<tr><td>Altitude</td><td>", fireball_data_trans$alt, "</td></tr>",
-                                        "<tr><td>Velocity</td><td>", fireball_data_trans$vel, "</td></tr>",
-                                        "</table>")
+# Rename columns for easy/pretty display -------------------------------------------------------------
+colnames(fireball_data_trans) <- c("date",                           # This column will be use as rowname
+                                   "Energy (joules)",
+                                   "Impact Energy (kt)",
+                                   "lat",                            # This column is not displayed
+                                   "lng",                            # This column is not displayed
+                                   "Altitude (km)",
+                                   "Velocity (km/s)",
+                                   "id",                             # This column is not displayed
+                                   "Location (latitude, longitude)")
 
 # Create title ---------------------------------------------------------------------------------------
 min_fireball_date <- as.character(min(fireball_data_trans$date))
@@ -132,14 +137,17 @@ fireball_title <- stri_paste("<b>Near Earth Object close approaches from ", min_
                              max_fireball_date, "</b>")
 
 # Set color palatte for fireballs --------------------------------------------------------------------
-fireball_pal <- colorBin(c("#0000FF", "#FFFF00", "#FF0000"), log(fireball_data_trans$`impact-e`), 10)
+fireball_pal <- colorBin(c("#0000FF", "#FFFF00", "#FF0000"), log(fireball_data_trans$`Impact Energy (kt)`), 10)
 
 # Select last recorded fireball ----------------------------------------------------------------------
 fireball_last <- fireball_data_trans[fireball_data_trans$date == max(fireball_data_trans$date), ]
 
+# Set date as rowname --------------------------------------------------------------------------------
+rownames(fireball_data_trans) <- fireball_data_trans$date; fireball_data_trans$date <- NULL
+
 # Set initial lng and lat ----------------------------------------------------------------------------
-lng <<- 0
-lat <<- 0
+lng <- 0
+lat <- 0
 
 ######################################################################################################
 # Shiny                                                                                              #
@@ -220,39 +228,48 @@ shinyServer(function(input, output, session) {
         
         output$Map <- renderLeaflet({
             leaflet() %>% setView(lng, lat, 3) %>% addTiles(options = tileOptions(noWrap = TRUE)) %>%
-                addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`impact-e`) + 3, 
-                                 fillColor = ~fireball_pal(log(`impact-e`)), color = ~fireball_pal(log(`impact-e`)), 
+                addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 3, 
+                                 fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), color = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  fillOpacity = 0.5, opacity = 0.5, weight = 1, stroke = TRUE,
-                                 group = "fireball", layerId = ~id, popup = ~popup) %>%
+                                 group = "fireball", layerId = ~id) %>%
                 addCircleMarkers(data = fireball_last, radius = 20,
                                  fill = FALSE, color = "red", 
                                  opacity = 0.5, weight = 2, 
                                  stroke = TRUE, layerId = "last") %>%
-                addLegend(pal = fireball_pal, values = log(fireball_data_trans$`impact-e`), title = "Approximate Total<br>Impact Energy [log(kt)]")
+                addLegend(pal = fireball_pal, values = log(fireball_data_trans$`Impact Energy (kt)`), title = "Approximate Total<br>Impact Energy [log(kt)]")
         })
         
         observeEvent(input$Map_marker_click, {
             p <- input$Map_marker_click
-            lat <<- p$lat
-            lng <<- p$lng
+            lat <- p$lat
+            lng <- p$lng
+            id <- p$id
             
             proxy <- leafletProxy("Map")
             if(p$id == "selected") {
                 proxy %>% removeMarker(layerId = "selected")
             } else {
+                # Create the fireball table ----------------------------------------------------------
+                fireball_data_trans_select <<- fireball_data_trans[fireball_data_trans$id == id, ]
+                
+                sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", lng, "&lat=", lat, "&api_key=", api_key$key)
+                sat_data_raw <<- fromJSON(sat_query, flatten = TRUE)
+                
+                if(!is.null(sat_data_raw$error)) {
+                    fireball_data_trans_select$`Satellite Image` <- "No satellite image found"
+                } else {
+                    fireball_data_trans_select$`Satellite Image` <- stri_paste("<a href='", sat_data_raw$url, "' target='_blank'>",
+                                                                               "View latest satellite image", "</a>")
+                }
+                
+                fireball_data_trans_select <- subset(fireball_data_trans_select, selec = -c(lat, lng, id))
+                
+                output$fireball_table <- DT::renderDataTable(fireball_data_trans_select[, -10], server = FALSE, 
+                                                             options = list(dom = "t", autoWidth = TRUE),
+                                                             autoHideNavigation = TRUE, selection = "single", escape = FALSE)
+                
+                # Create selected marker -------------------------------------------------------------
                 proxy %>% setView(lng = lng, lat = lat, input$Map_zoom) %>% acm_defaults(lng, lat)
-            }
-        })
-        
-        observeEvent(input$sat_button, {
-            sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", lng, "&lat=", lat, "&api_key=", api_key$key)
-            sat_data_raw <<- fromJSON(sat_query, flatten = TRUE)
-            
-            try(browseURL(sat_data_raw$url), silent = TRUE)
-            if(!is.null(sat_data_raw$error)) {
-                output$sat_error <- renderUI("No satellite image found")
-            } else {
-                output$sat_error <- renderUI(stri_paste("Satellite image from", sat_data_raw$date, "found", sep = " "))
             }
         })
     })
