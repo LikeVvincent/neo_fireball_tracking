@@ -229,14 +229,16 @@ shinyServer(function(input, output, session) {
         output$Map <- renderLeaflet({
             leaflet() %>% setView(lng, lat, 3) %>% addTiles(options = tileOptions(noWrap = TRUE)) %>%
                 addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 3, 
-                                 fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), color = ~fireball_pal(log(`Impact Energy (kt)`)), 
+                                 fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), 
+                                 color = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  fillOpacity = 0.5, opacity = 0.5, weight = 1, stroke = TRUE,
                                  group = "fireball", layerId = ~id) %>%
                 addCircleMarkers(data = fireball_last, radius = 20,
                                  fill = FALSE, color = "red", 
                                  opacity = 0.5, weight = 2, 
                                  stroke = TRUE, layerId = "last") %>%
-                addLegend(pal = fireball_pal, values = log(fireball_data_trans$`Impact Energy (kt)`), title = "Approximate Total<br>Impact Energy [log(kt)]")
+                addLegend(pal = fireball_pal, values = log(fireball_data_trans$`Impact Energy (kt)`), 
+                          title = "Approximate Total<br>Impact Energy [log(kt)]")
         })
         
         observeEvent(input$Map_marker_click, {
@@ -249,27 +251,28 @@ shinyServer(function(input, output, session) {
             if(p$id == "selected") {
                 proxy %>% removeMarker(layerId = "selected")
             } else {
-                # Create the fireball table ----------------------------------------------------------
-                fireball_data_trans_select <<- fireball_data_trans[fireball_data_trans$id == id, ]
-                
-                sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", lng, "&lat=", lat, "&api_key=", api_key$key)
-                sat_data_raw <<- fromJSON(sat_query, flatten = TRUE)
-                
-                if(!is.null(sat_data_raw$error)) {
-                    fireball_data_trans_select$`Satellite Image` <- "No satellite image found"
-                } else {
-                    fireball_data_trans_select$`Satellite Image` <- stri_paste("<a href='", sat_data_raw$url, "' target='_blank'>",
-                                                                               "View latest satellite image", "</a>")
-                }
-                
-                fireball_data_trans_select <- subset(fireball_data_trans_select, selec = -c(lat, lng, id))
-                
-                output$fireball_table <- DT::renderDataTable(fireball_data_trans_select[, -10], server = FALSE, 
-                                                             options = list(dom = "t", autoWidth = TRUE),
-                                                             autoHideNavigation = TRUE, selection = "single", escape = FALSE)
-                
                 # Create selected marker -------------------------------------------------------------
                 proxy %>% setView(lng = lng, lat = lat, input$Map_zoom) %>% acm_defaults(lng, lat)
+                
+                # Create the fireball table ----------------------------------------------------------
+                fireball_data_trans_select <- fireball_data_trans[fireball_data_trans$id == id, ]
+                
+                sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", 
+                                         lng, "&lat=", lat, "&cloud_score=True&api_key=", api_key$key)
+                sat_data_raw <- fromJSON(sat_query, flatten = TRUE)
+                
+                if(!is.null(sat_data_raw$error)) {
+                    fireball_data_trans_select$`Satellite Image` <- "No image found"
+                } else {
+                    fireball_data_trans_select$`Satellite Image` <- stri_paste("<a href='", sat_data_raw$url, 
+                                                                               "' target='_blank'>",
+                                                                               "View (date: ", stri_sub(sat_data_raw$date, 1, 10), 
+                                                                               ", clouds: ", round(sat_data_raw$cloud_score * 100, 0), "%)</a>")
+                }
+                
+                output$fireball_table <- DT::renderDataTable(subset(fireball_data_trans_select, selec = -c(lat, lng, id)), server = FALSE, 
+                                                             options = list(dom = "t", autoWidth = TRUE),
+                                                             autoHideNavigation = TRUE, selection = "single", escape = FALSE)
             }
         })
     })
