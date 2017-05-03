@@ -33,17 +33,13 @@ neo_data_trans <- neo_data_raw
 rownames(neo_data_trans) <- neo_data_trans$neo_reference_id
 
 # Convert is_potentially_hazardous_asteroid to a No/Yes factor ---------------------------------------
-neo_data_trans$is_potentially_hazardous_asteroid <- as.character(neo_data_trans$is_potentially_hazardous_asteroid)
-neo_data_trans$is_potentially_hazardous_asteroid[neo_data_trans$is_potentially_hazardous_asteroid == "FALSE"] <- "No"
-neo_data_trans$is_potentially_hazardous_asteroid[neo_data_trans$is_potentially_hazardous_asteroid == "TRUE"] <- "Yes"
-neo_data_trans$is_potentially_hazardous_asteroid <- as.factor(neo_data_trans$is_potentially_hazardous_asteroid)
-
-# Create display as nasa_jpl_url --------------------------------------------------------------------- 
-neo_data_trans$display_name <- stri_paste("<a href='", neo_data_trans$nasa_jpl_url, "' target='_blank'>",
-                                          neo_data_trans$name, "</a>")
-
+# Create display as nasa_jpl_url ---------------------------------------------------------------------
 # Date conversion ------------------------------------------------------------------------------------
-neo_data_trans$close_approach_date <- ymd(neo_data_trans$close_approach_date)
+neo_data_trans <- mutate(neo_data_trans, is_potentially_hazardous_asteroid = as.character(is_potentially_hazardous_asteroid)) %>%
+    mutate(is_potentially_hazardous_asteroid = if_else(is_potentially_hazardous_asteroid == "FALSE", "No", "Yes")) %>%
+    mutate(is_potentially_hazardous_asteroid = as.factor(is_potentially_hazardous_asteroid),
+           display_name = stri_paste("<a href='", nasa_jpl_url, "' target='_blank'>", name, "</a>"),
+           close_approach_date = ymd(close_approach_date))
 
 # Remove not needed columns --------------------------------------------------------------------------
 for(i in c("neo_reference_id", 
@@ -57,7 +53,12 @@ for(i in c("neo_reference_id",
 }
 
 # Convert characters into numerics ------------------------------------------------------------------- 
-for(i in 11:16) {
+for(i in c("relative_velocity.kilometers_per_hour",
+           "relative_velocity.miles_per_hour",
+           "miss_distance.astronomical",
+           "miss_distance.lunar",
+           "miss_distance.kilometers",
+           "miss_distance.miles")) {
     neo_data_trans[, i] <- as.numeric(neo_data_trans[, i])
 }
 
@@ -81,8 +82,8 @@ colnames(neo_data_trans) <- c("Name",
                               "Display Name")
 
 # Create title ---------------------------------------------------------------------------------------
-min_neo_date <- as.character(min(neo_data_trans[, 9]))
-max_neo_date <- as.character(max(neo_data_trans[, 9]))
+min_neo_date <- as.character(min(neo_data_trans$`Close Approach Date`))
+max_neo_date <- as.character(max(neo_data_trans$`Close Approach Date`))
 neo_title <- stri_paste("<b>Near Earth Object close approaches from ", min_neo_date, " to ", 
                         max_neo_date, "</b>")
 
@@ -92,10 +93,13 @@ pha_pal <- c("green3", "red2")
 # Fireball -------------------------------------------------------------------------------------------
 fireball_data_trans <- fireball_data_raw
 
-# Date and numeric conversion ------------------------------------------------------------------------
-fireball_data_trans$date <- ymd_hms(fireball_data_trans$date)
-
-for(i in c(2, 3, 4, 6, 8, 9)) {
+# Numeric conversion ---------------------------------------------------------------------------------
+for(i in c("energy",
+           "impact-e",
+           "lat",
+           "lon",
+           "alt",
+           "vel")) {
     fireball_data_trans[, i] <- as.numeric(fireball_data_trans[, i])
 }
 
@@ -104,18 +108,17 @@ fireball_data_trans <- subset(fireball_data_trans, !is.na(lon) & !is.na(lat))
 fireball_data_trans[is.na(fireball_data_trans)] <- "-"
 
 # Create lon/lat that can be plotted correctly -------------------------------------------------------
-fireball_data_trans$lat[fireball_data_trans$`lat-dir`== "S"] <- -fireball_data_trans$lat[fireball_data_trans$`lat-dir`== "S"]
-fireball_data_trans$lon[fireball_data_trans$`lon-dir`== "W"] <- -fireball_data_trans$lon[fireball_data_trans$`lon-dir`== "W"]
-
-# New latitude name and id column --------------------------------------------------------------------
-colnames(fireball_data_trans)[6] <- "lng"
-fireball_data_trans$id <- 1:nrow(fireball_data_trans)
-
 # Create geo_location column -------------------------------------------------------------------------
-fireball_data_trans$geo_location <- stri_paste("(", fireball_data_trans$lat, ", ", fireball_data_trans$lng, ")")
+# Date conversion ------------------------------------------------------------------------------------
+# Create id column -----------------------------------------------------------------------------------
+fireball_data_trans <- mutate(fireball_data_trans, lat = if_else(`lat-dir` == "S", -lat, lat),
+                              lng = if_else(`lon-dir` == "W", -lon, lon)) %>%
+    mutate(geo_location = stri_paste("(", lat, ", ", lng, ")"),
+           date = ymd_hms(date),
+           id = 1:nrow(fireball_data_trans))
 
 # Remove not needed columns --------------------------------------------------------------------------
-for(i in c("lat-dir", "lon-dir")) {
+for(i in c("lon", "lat-dir", "lon-dir")) {
     fireball_data_trans[, i] <- NULL
 }
 
@@ -124,11 +127,11 @@ colnames(fireball_data_trans) <- c("date",                           # This colu
                                    "Energy (joules)",
                                    "Impact Energy (kt)",
                                    "lat",                            # This column is not displayed
-                                   "lng",                            # This column is not displayed
                                    "Altitude (km)",
                                    "Velocity (km/s)",
-                                   "id",                             # This column is not displayed
-                                   "Location (latitude, longitude)")
+                                   "lng",                            # This column is not displayed
+                                   "Location (latitude, longitude)",
+                                   "id")                             # This column is not displayed   
 
 # Create title ---------------------------------------------------------------------------------------
 min_fireball_date <- as.character(min(fireball_data_trans$date))
@@ -227,7 +230,8 @@ shinyServer(function(input, output, session) {
                                                              stroke = TRUE, layerId = "selected")
         
         output$Map <- renderLeaflet({
-            leaflet() %>% setView(lng, lat, 3) %>% addTiles(options = tileOptions(noWrap = TRUE)) %>%
+            leaflet() %>% setView(lng, lat, 3) %>% 
+                addProviderTiles("Stamen.TerrainBackground", options = tileOptions(noWrap = TRUE)) %>%
                 addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 3, 
                                  fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  color = ~fireball_pal(log(`Impact Energy (kt)`)), 
