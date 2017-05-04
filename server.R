@@ -225,7 +225,7 @@ shinyServer(function(input, output, session) {
     
     observe({
         acm_defaults <- function(map, x, y) addCircleMarkers(map, x, y, radius = 15,
-                                                             fill = FALSE, color = "black", 
+                                                             fill = FALSE, color = "yellow", 
                                                              opacity = 0.5, weight = 2, 
                                                              stroke = TRUE, layerId = "selected")
         
