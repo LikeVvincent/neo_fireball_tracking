@@ -140,7 +140,7 @@ fireball_title <- stri_paste("<b>Near Earth Object close approaches from ", min_
                              max_fireball_date, "</b>")
 
 # Set color palatte for fireballs --------------------------------------------------------------------
-fireball_pal <- colorBin(c("#0000FF", "#FFFF00", "#FF0000"), log(fireball_data_trans$`Impact Energy (kt)`), 10)
+fireball_pal <- colorBin(c("#FFFF00", "#FF0000"), log(fireball_data_trans$`Impact Energy (kt)`), 10)
 
 # Select last recorded fireball ----------------------------------------------------------------------
 fireball_last <- fireball_data_trans[fireball_data_trans$date == max(fireball_data_trans$date), ]
@@ -231,7 +231,7 @@ shinyServer(function(input, output, session) {
         
         output$Map <- renderLeaflet({
             leaflet() %>% setView(lng, lat, 3) %>% 
-                addProviderTiles("Stamen.TerrainBackground", options = tileOptions(noWrap = TRUE)) %>%
+                addProviderTiles("Esri.WorldImagery", options = tileOptions(noWrap = TRUE)) %>%
                 addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 3, 
                                  fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  color = ~fireball_pal(log(`Impact Energy (kt)`)), 

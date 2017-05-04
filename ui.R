@@ -6,6 +6,7 @@
 options(scipen = 999)
 
 # Packages -------------------------------------------------------------------------------------------
+library(dplyr)
 library(DT)
 library(foreach)
 library(jsonlite)
