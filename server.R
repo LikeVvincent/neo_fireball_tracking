@@ -232,15 +232,14 @@ shinyServer(function(input, output, session) {
         output$Map <- renderLeaflet({
             leaflet() %>% setView(lng, lat, 3) %>% 
                 addProviderTiles("Esri.WorldImagery", options = tileOptions(noWrap = TRUE)) %>%
-                addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 3, 
+                addCircleMarkers(data = fireball_data_trans, radius = ~sqrt(`Impact Energy (kt)`) + 4, 
                                  fillColor = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  color = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  fillOpacity = 0.5, opacity = 0.5, weight = 1, stroke = TRUE,
-                                 group = "fireball", layerId = ~id) %>%
-                addCircleMarkers(data = fireball_last, radius = 20,
-                                 fill = FALSE, color = "red", 
-                                 opacity = 0.5, weight = 2, 
-                                 stroke = TRUE, layerId = "last") %>%
+                                 layerId = ~id) %>%
+                addPulseMarkers(data = fireball_last, 
+                                icon = makePulseIcon(heartbeat = 0.5, iconSize = ~sqrt(`Impact Energy (kt)`) + 14),
+                                layerId = ~id) %>%
                 addLegend(pal = fireball_pal, values = log(fireball_data_trans$`Impact Energy (kt)`), 
                           title = "Approximate Total<br>Impact Energy [log(kt)]")
         })
