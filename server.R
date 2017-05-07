@@ -237,8 +237,10 @@ shinyServer(function(input, output, session) {
                                  color = ~fireball_pal(log(`Impact Energy (kt)`)), 
                                  fillOpacity = 0.5, opacity = 0.5, weight = 1, stroke = TRUE,
                                  layerId = ~id) %>%
-                addPulseMarkers(data = fireball_last, 
-                                icon = makePulseIcon(heartbeat = 0.5, iconSize = ~sqrt(`Impact Energy (kt)`) + 14),
+                addPulseMarkers(data = fireball_last,
+                                icon = makePulseIcon(color = ~fireball_pal(log(`Impact Energy (kt)`)),
+                                                     iconSize = ~sqrt(`Impact Energy (kt)`) + 14, 
+                                                     animate = TRUE, heartbeat = 0.5),
                                 layerId = ~id) %>%
                 addLegend(pal = fireball_pal, values = log(fireball_data_trans$`Impact Energy (kt)`), 
                           title = "Approximate Total<br>Impact Energy [log(kt)]")
