@@ -168,32 +168,28 @@ shinyServer(function(input, output, session) {
             s <- input$neo_table_rows_selected
             
             # If row not selected hide annotations otherwise display ---------------------------------
-            if(is.null(s)) {
-                a <- list(
-                    x = 0,
-                    y = 0,
-                    text = "",
-                    xref = "x",
-                    yref = "y",
-                    showarrow = FALSE,
-                    arrowhead = 0,
-                    arrowsize = 0,
-                    ax = 20,
-                    ay = -40
-                )
+            a <- if(is.null(s)) {
+                list(x = 0,
+                     y = 0,
+                     text = "",
+                     xref = "x",
+                     yref = "y",
+                     showarrow = FALSE,
+                     arrowhead = 0,
+                     arrowsize = 0,
+                     ax = 20,
+                     ay = -40)
             } else {
-                a <- list(
-                    x = neo_data_trans_subset[, 9][s],
-                    y = neo_data_trans_subset[, 11][s],
-                    text = neo_data_trans_subset[, 1][s],
-                    xref = "x",
-                    yref = "y",
-                    showarrow = TRUE,
-                    arrowhead = 0,
-                    arrowsize = 0,
-                    ax = 20,
-                    ay = -40
-                )
+                list(x = neo_data_trans_subset[, 9][s],
+                     y = neo_data_trans_subset[, 11][s],
+                     text = neo_data_trans_subset[, 1][s],
+                     xref = "x",
+                     yref = "y",
+                     showarrow = TRUE,
+                     arrowhead = 0,
+                     arrowsize = 0,
+                     ax = 20,
+                     ay = -40)
             }
             
             # Set x/y title based on selected input parameters --------------------------------------- 
@@ -263,16 +259,16 @@ shinyServer(function(input, output, session) {
                 fireball_data_trans_select <- fireball_data_trans[fireball_data_trans$id == id, ]
                 
                 sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", 
-                                         lng, "&lat=", lat, "&cloud_score=True&api_key=", api_key$key)
+                                        lng, "&lat=", lat, "&cloud_score=True&api_key=", api_key$key)
                 sat_data_raw <- fromJSON(sat_query, flatten = TRUE)
                 
-                if(!is.null(sat_data_raw$error)) {
-                    fireball_data_trans_select$`Satellite Image` <- "No image found"
+                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error)) {
+                    "No image found"
                 } else {
-                    fireball_data_trans_select$`Satellite Image` <- stri_paste("<a href='", sat_data_raw$url, 
-                                                                               "' target='_blank'>",
-                                                                               "View (date: ", stri_sub(sat_data_raw$date, 1, 10), 
-                                                                               ", clouds: ", round(sat_data_raw$cloud_score * 100, 0), "%)</a>")
+                    stri_paste("<a href='", sat_data_raw$url,
+                               "' target='_blank'>",
+                               "View (date: ", stri_sub(sat_data_raw$date, 1, 10), 
+                               ", clouds: ", round(sat_data_raw$cloud_score * 100, 0), "%)</a>")
                 }
                 
                 output$fireball_table <- DT::renderDataTable(subset(fireball_data_trans_select, selec = -c(lat, lng, id)), server = FALSE, 
