@@ -260,9 +260,10 @@ shinyServer(function(input, output, session) {
                 
                 sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", 
                                         lng, "&lat=", lat, "&cloud_score=True&api_key=", api_key$key)
-                sat_data_raw <- fromJSON(sat_query, flatten = TRUE)
                 
-                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error)) {
+                sat_data_raw <- try(fromJSON(sat_query, flatten = TRUE), silent = TRUE)
+                
+                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error || class(sat_data_raw) = "try-error")) {
                     "No image found"
                 } else {
                     stri_paste("<a href='", sat_data_raw$url,
