@@ -258,20 +258,6 @@ shinyServer(function(input, output, session) {
                 # Create the fireball table ----------------------------------------------------------
                 fireball_data_trans_select <- fireball_data_trans[fireball_data_trans$id == id, ]
                 
-                sat_query <- stri_paste("https://api.nasa.gov/planetary/earth/imagery?lon=", 
-                                        lng, "&lat=", lat, "&cloud_score=True&api_key=", api_key$key)
-                
-                sat_data_raw <- try(fromJSON(sat_query, flatten = TRUE), silent = TRUE)
-                
-                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error || class(sat_data_raw) == "try-error")) {
-                    "No image found"
-                } else {
-                    stri_paste("<a href='", sat_data_raw$url,
-                               "' target='_blank'>",
-                               "View (date: ", stri_sub(sat_data_raw$date, 1, 10), 
-                               ", clouds: ", round(sat_data_raw$cloud_score * 100, 0), "%)</a>")
-                }
-                
                 output$fireball_table <- DT::renderDataTable(subset(fireball_data_trans_select, selec = -c(lat, lng, id)), server = FALSE, 
                                                              options = list(dom = "t", autoWidth = TRUE),
                                                              autoHideNavigation = TRUE, selection = "single", escape = FALSE)
