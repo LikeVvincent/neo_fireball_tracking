@@ -263,7 +263,7 @@ shinyServer(function(input, output, session) {
                 
                 sat_data_raw <- try(fromJSON(sat_query, flatten = TRUE), silent = TRUE)
                 
-                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error || class(sat_data_raw) = "try-error")) {
+                fireball_data_trans_select$`Satellite Image` <- if(!is.null(sat_data_raw$error || class(sat_data_raw) == "try-error")) {
                     "No image found"
                 } else {
                     stri_paste("<a href='", sat_data_raw$url,
